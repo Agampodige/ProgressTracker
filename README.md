@@ -4,7 +4,7 @@
 
 A simple, intuitive desktop application built with PyQt6 to help you track the progress of multiple projects, estimate their time to completion (ETC), and manage project details efficiently.
 
-![Uploading android-chrome-512x512.png…]()
+![android-chrome-512x512](https://github.com/user-attachments/assets/d3bacefc-90e8-48ae-a45d-40f057b5c273)
 
 
 ## ✨ Features
@@ -31,29 +31,7 @@ The easiest way to use the application is to download the pre-compiled executabl
 
 1.  **Download the latest version:**
 
-    * **Direct Download:** [Download `progess-setup.exe` (or `progess.exe` if no installer)](YOUR_DOWNLOAD_LINK_HERE)
-
-        * *(Replace `YOUR_DOWNLOAD_LINK_HERE` with the actual link to your hosted installer or executable file, e.g., from GitHub Releases or your website.)*
-
-2.  **Installation:**
-
-    * **If you downloaded `progess-setup.exe` (Installer):**
-
-        * Run the installer and follow the on-screen prompts. This will set up the application, create Start Menu shortcuts, and allow for easy uninstallation.
-
-    * **If you downloaded `progess.exe` (Single Executable):**
-
-        * Simply place the `progess.exe` file in any folder on your computer (e.g., `C:\Program Files\ProgressApp` or `C:\Users\YourUser\Documents\ProgressApp`).
-
-        * You can create a desktop shortcut to `progess.exe` for easy access.
-
-**Important Note on Security Warnings:**
-When you run the executable for the first time, Windows SmartScreen or your antivirus software might display a warning about "unknown publisher" or "unrecognized app." This is common for applications that are not digitally code-signed. To proceed:
-
-* Click "More info" (or similar) and then "Run anyway."
-
-* If your antivirus flags it, you may need to add an exception.
-    This warning will disappear if the application is digitally signed (which requires purchasing a code-signing certificate) or gains enough reputation.
+    * **Direct Download:** [Download `setup.exe` ](YOUR_DOWNLOAD_LINK_HERE)
 
 ## 🚀 Usage
 
