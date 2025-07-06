@@ -37,8 +37,11 @@ class ModernProgressBarApp(QWidget):
         super().__init__()
         self.setWindowTitle("PyQt6 Multi-Project Progress & ETC Estimator")
         self.setMinimumSize(850, 600) # Set a minimum size instead
-        self.setWindowIcon(QIcon("app_icon.ico"))
-        # --- Use standard window flags for OS-drawn frame and controls ---
+        # Note: 'app_icon.ico' needs to be in the same directory as the script
+        # or a valid path to an icon file. If not present, this line might cause a warning.
+        # self.setWindowIcon(QIcon("app_icon.ico")) 
+        
+        # Use standard window flags for OS-drawn frame and controls
         self.setWindowFlags(Qt.WindowType.Window) # This enables the default title bar and resizing
 
         self.projects: Dict[str, Project] = {}
@@ -53,15 +56,23 @@ class ModernProgressBarApp(QWidget):
 
         # Load projects from file
         self.load_projects()
+        print(f"DEBUG: After load_projects. self.projects count: {len(self.projects)}, current_project_id: {self.current_project_id}")
 
         # Add an initial project if none exist after loading
         if not self.projects:
+            print("DEBUG: No projects loaded, adding a new one.")
             self.add_new_project()
         else:
             # Select the first project if projects were loaded
             if self.project_list_widget.count() > 0:
+                print("DEBUG: Projects loaded, setting current row to 0.")
                 self.project_list_widget.setCurrentRow(0)
+            else:
+                print("DEBUG: No items in project list widget despite projects in self.projects. Adding new project.")
+                # This case should ideally not happen if load_projects populates the list widget correctly
+                self.add_new_project() # Fallback if list widget is empty for some reason
 
+        print(f"DEBUG: End of __init__. Final current_project_id: {self.current_project_id}")
         # Removed custom dragging logic as OS handles it now
 
     def get_data_file_path(self):
@@ -277,7 +288,8 @@ class ModernProgressBarApp(QWidget):
         
         self.start_timer_button = QPushButton("Start Timer")
         self.start_timer_button.setIcon(QIcon.fromTheme("media-playback-start"))
-        self.start_timer_button.clicked.connect(self.toggle_timer)
+        # CORRECTED LINE: Use lambda to prevent False from being passed as project_id
+        self.start_timer_button.clicked.connect(lambda: self.toggle_timer())
         self.start_timer_button.setObjectName("startButton")
         button_layout.addWidget(self.start_timer_button)
 
@@ -473,6 +485,11 @@ class ModernProgressBarApp(QWidget):
         item.setData(Qt.ItemDataRole.UserRole, new_project.id) # Store ID in item data
         self.project_list_widget.addItem(item)
         self.project_list_widget.setCurrentItem(item) # Select the new project
+        
+        # Explicitly set current_project_id after adding and selecting
+        self.current_project_id = new_project.id 
+        print(f"DEBUG: Added new project. Current project ID: {self.current_project_id}")
+        
         # No need to call save_projects here, as closeEvent will handle it
 
     def delete_selected_project(self):
@@ -491,11 +508,13 @@ class ModernProgressBarApp(QWidget):
 
         if reply == QMessageBox.StandardButton.Yes:
             # Stop timer if it's running for the deleted project
-            if self.projects[project_id_to_delete].is_running:
+            if project_id_to_delete in self.projects and self.projects[project_id_to_delete].is_running:
                 self.projects[project_id_to_delete].is_running = False
                 # No need to stop global timer, it continues for other projects
 
-            del self.projects[project_id_to_delete]
+            if project_id_to_delete in self.projects:
+                del self.projects[project_id_to_delete]
+            
             row = self.project_list_widget.row(current_item)
             self.project_list_widget.takeItem(row)
             
@@ -520,8 +539,10 @@ class ModernProgressBarApp(QWidget):
 
     def select_project_from_list(self, current_item: QListWidgetItem, previous_item: QListWidgetItem):
         """Loads the selected project's data into the UI."""
+        print(f"DEBUG: select_project_from_list called. Current item: {current_item.text() if current_item else 'None'}")
         if current_item is None:
             self.current_project_id = None
+            print("DEBUG: No item selected, current_project_id set to None.")
             # Clear UI if no project is selected
             self.project_name_input.setText("")
             self.project_description_input.setText("") # Clear description
@@ -537,10 +558,38 @@ class ModernProgressBarApp(QWidget):
             return
 
         project_id = current_item.data(Qt.ItemDataRole.UserRole)
+        print(f"DEBUG: Project ID from list item: {project_id}")
+        
+        # --- NEW CHECK ADDED HERE ---
+        if project_id not in self.projects:
+            QMessageBox.critical(self, "Project Data Error", 
+                                 f"Selected project ID '{project_id}' not found in application's data. "
+                                 "This might indicate data corruption or an internal sync issue. "
+                                 "Please try adding a new project or restarting the application. "
+                                 "Your 'projects.json' file might be corrupted.")
+            self.current_project_id = None # Clear potentially invalid selection
+            print("DEBUG: Project ID not found in self.projects. Current project ID set to None.")
+            # Clear UI fields to reflect no selection
+            self.project_name_input.setText("")
+            self.project_description_input.setText("")
+            self.total_value_input.setText("0.0")
+            self.current_value_input.setText("0.0")
+            self.etc_label.setText("ETC: --:--:--")
+            self.percentage_label.setText("0.0%")
+            self.progress_bar.setValue(0)
+            self.start_timer_button.setText("Start Timer")
+            self.start_timer_button.setIcon(QIcon.fromTheme("media-playback-start"))
+            self.start_timer_button.setProperty("running", "false")
+            self.start_timer_button.style().polish(self.start_timer_button)
+            return # Stop further processing as the project is not valid
+        # --- END OF NEW CHECK ---
+
         if project_id == self.current_project_id:
+            print(f"DEBUG: Project {project_id} already selected.")
             return # Already selected
 
         self.current_project_id = project_id
+        print(f"DEBUG: Current project ID updated to: {self.current_project_id}")
         project = self.projects[self.current_project_id]
 
         # Update UI elements with selected project's data
@@ -596,6 +645,7 @@ class ModernProgressBarApp(QWidget):
         Updates the project data and shows QMessageBox for invalid inputs.
         """
         if not self.current_project_id:
+            print(f"DEBUG: _finalize_input_editing called but no current_project_id. Field: {field_name}")
             return
 
         project = self.projects[self.current_project_id]
@@ -618,23 +668,26 @@ class ModernProgressBarApp(QWidget):
                 elif value > project.total_units: # Current cannot exceed total
                     QMessageBox.information(self, "Input Info", f"{field_name} cannot exceed Total Work Units. Setting to Total Work Units.")
                     value = project.total_units # Cap current at total
-                    if project.is_running: # If timer was running and now complete
-                        self.toggle_timer(project.id) # Stop the timer
+                    # Do NOT call self.toggle_timer here. The main toggle_timer
+                    # function will handle stopping if current >= total before starting.
 
             setattr(project, project_attr, value) # Update project data
             line_edit.setText(f"{value:.1f}") # Reformat to 1 decimal place
+            print(f"DEBUG: Finalized {field_name} for project {project.name}: {value}")
 
         except ValueError:
             if text.strip() != "": # Only warn if something was typed that isn't a number
                 QMessageBox.warning(self, "Input Error", f"Please enter a valid number for {field_name}.")
             line_edit.setText(f"{getattr(project, project_attr):.1f}") # Revert to last valid value
+            print(f"DEBUG: Invalid input for {field_name}. Reverted to {getattr(project, project_attr):.1f}")
         
         self._update_display_from_inputs() # Update display after finalization
-        # No need to call save_projects here, as closeEvent will handle it
+        # No need to call save_projects here, as closeEvent will handle it    
 
     def _update_display_from_inputs(self):
         """Updates display elements based on current (potentially unfinalized) input values of the selected project."""
         if not self.current_project_id:
+            print("DEBUG: _update_display_from_inputs called but no current_project_id.")
             return
 
         project = self.projects[self.current_project_id]
@@ -647,6 +700,7 @@ class ModernProgressBarApp(QWidget):
         # This is important for ETC calculation to use the latest typed values
         project.current_units = current
         project.total_units = total
+        print(f"DEBUG: _update_display_from_inputs for {project.name}. Current: {current}, Total: {total}")
 
         progress_percentage = 0.0
         if total > 0:
@@ -668,14 +722,17 @@ class ModernProgressBarApp(QWidget):
 
     def update_etc_for_project(self, project: Project):
         """Calculates and updates the Estimated Time to Completion (ETC) for a given project."""
+        # Only update display if it's the currently displayed project
+        is_current_display = (project.id == self.current_project_id)
+        # print(f"DEBUG: update_etc_for_project called for {project.name}. is_running: {project.is_running}, is_current_display: {is_current_display}")
+
         if not project.is_running:
-            # If paused, display elapsed time
             if project.start_time is not None:
                 elapsed_display = self.format_time(project.elapsed_at_pause)
-                if project.id == self.current_project_id: # Only update if it's the currently displayed project
+                if is_current_display:
                     self.etc_label.setText(f"ETC: Paused ({elapsed_display} elapsed)")
             else:
-                if project.id == self.current_project_id:
+                if is_current_display:
                     self.etc_label.setText("ETC: --:--:--")
             return
 
@@ -684,35 +741,37 @@ class ModernProgressBarApp(QWidget):
             current_elapsed_time = project.elapsed_at_pause + (time.time() - project.start_time)
 
             if project.total_units <= 0:
-                if project.id == self.current_project_id:
+                if is_current_display:
                     self.etc_label.setText("ETC: Total > 0 req.")
                 return
 
             # If current units are 0 and timer just started, or elapsed time is effectively zero
             if math.isclose(project.current_units, 0.0) or math.isclose(current_elapsed_time, 0.0):
-                if project.id == self.current_project_id:
+                if is_current_display:
                     self.etc_label.setText("ETC: Calculating...")
                 return
             
             progress_ratio = project.current_units / project.total_units
             
             if progress_ratio >= 1.0:
-                if project.id == self.current_project_id:
+                if is_current_display:
                     self.etc_label.setText("ETC: Complete!")
+                # Automatically stop timer if project is complete
+                # Check if it's running before calling toggle_timer to avoid infinite loop
                 if project.is_running:
-                    # Automatically stop timer if project is complete
+                    print(f"DEBUG: Project {project.name} complete. Stopping timer via update_etc_for_project.")
                     self.toggle_timer(project.id) 
                 return
             elif progress_ratio > 0:
                 rate = project.current_units / current_elapsed_time
                 remaining_time = (project.total_units - project.current_units) / rate
-                if project.id == self.current_project_id:
+                if is_current_display:
                     self.etc_label.setText(f"ETC: {self.format_time(remaining_time)}")
             else:
-                if project.id == self.current_project_id:
+                if is_current_display:
                     self.etc_label.setText("ETC: Estimating...")
         except (ValueError, ZeroDivisionError):
-            if project.id == self.current_project_id:
+            if is_current_display:
                 self.etc_label.setText("ETC: Error")
 
     def update_all_etcs(self):
@@ -722,11 +781,13 @@ class ModernProgressBarApp(QWidget):
 
     def toggle_timer(self, project_id: Optional[str] = None):
         """Starts or stops the timer for the specified project ID, or current if none."""
+        print(f"DEBUG: toggle_timer called. Initial project_id param: {project_id}, self.current_project_id: {self.current_project_id}")
         if project_id is None:
             project_id = self.current_project_id
 
         if not project_id or project_id not in self.projects:
             QMessageBox.information(self, "Timer Control", "No project selected or invalid project.")
+            print(f"ERROR: toggle_timer failed. project_id: {project_id}, exists in self.projects: {project_id in self.projects if project_id else 'N/A'}")
             return
 
         project = self.projects[project_id]
@@ -739,25 +800,32 @@ class ModernProgressBarApp(QWidget):
             self._finalize_input_editing(self.total_value_input, "total_units", "Total Work Units", is_total=True)
             self._finalize_input_editing(self.current_value_input, "current_units", "Current Work Units", is_total=False)
             # Re-fetch values from the project object after finalization, as they might have been capped
+            # This step is crucial to ensure the project object has the most up-to-date, validated values
+            # before the timer logic proceeds.
             project.total_units = self._get_safe_value(self.total_value_input, default_val=project.total_units)
             project.current_units = self._get_safe_value(self.current_value_input, default_val=project.current_units)
+            print(f"DEBUG: toggle_timer - after finalization. Project {project.name}: Current: {project.current_units}, Total: {project.total_units}")
 
 
         if not project.is_running:
             # Pre-flight checks before starting
             if project.total_units <= 0:
                 QMessageBox.warning(self, "Timer Error", "Total Work Units must be a positive number to start the timer.")
+                print(f"ERROR: Timer not started for {project.name}. Total units <= 0.")
                 return
             if project.current_units < 0:
                 QMessageBox.warning(self, "Timer Error", "Current Work Units cannot be negative.")
+                print(f"ERROR: Timer not started for {project.name}. Current units < 0.")
                 return
             if project.current_units >= project.total_units:
                 QMessageBox.information(self, "Timer Info", "Current Work Units already meet or exceed Total. Project is complete. No need to start timer.")
                 self.update_etc_for_project(project) # Ensure ETC says "Complete!"
+                print(f"INFO: Timer not started for {project.name}. Project already complete.")
                 return
 
             project.start_time = time.time()
             project.is_running = True
+            print(f"DEBUG: Timer STARTED for project {project.name}.")
             
             if project_id == self.current_project_id:
                 self.start_timer_button.setText("Stop Timer")
@@ -769,6 +837,7 @@ class ModernProgressBarApp(QWidget):
                 project.elapsed_at_pause += (time.time() - project.start_time)
             project.is_running = False
             project.start_time = None # Clear start time when paused
+            print(f"DEBUG: Timer STOPPED for project {project.name}. Elapsed at pause: {project.elapsed_at_pause:.2f}")
             
             if project_id == self.current_project_id:
                 self.start_timer_button.setText("Start Timer")
@@ -784,9 +853,11 @@ class ModernProgressBarApp(QWidget):
         """Resets all values for the currently selected project and stops its timer."""
         if not self.current_project_id:
             QMessageBox.information(self, "Reset Project", "No project selected to reset.")
+            print("DEBUG: Reset attempted, but no project selected.")
             return
 
         project = self.projects[self.current_project_id]
+        print(f"DEBUG: Resetting project: {project.name}")
 
         project.is_running = False
         project.start_time = None
