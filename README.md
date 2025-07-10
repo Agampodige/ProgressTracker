@@ -31,7 +31,8 @@ The easiest way to use the application is to download the pre-compiled executabl
 
 1.  **Download the latest version:**
 
-    * **Direct Download:** [Download `setup.exe` ](YOUR_DOWNLOAD_LINK_HERE)
+    * [Latest release](https://github.com/Agampodige/ProgressTracker/releases/latest)
+    * **Direct Download:** [ `setup.exe` ](https://github.com/Agampodige/ProgressTracker/releases/download/v1.0.0/Setup.exe)
 
 ## 🚀 Usage
 
